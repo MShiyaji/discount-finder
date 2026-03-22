@@ -89,17 +89,6 @@ export async function scrapeProductHunt(
         )
       }
     }
-
-    // If scraping didn't work well, fall back to a curated list of popular products
-    if (services.length < 10) {
-      const fallbackProducts = getFallbackProductHuntProducts()
-      for (const product of fallbackProducts) {
-        if (!services.some((s) => s.name === product.name)) {
-          services.push(product)
-        }
-        if (services.length >= limit) break
-      }
-    }
   } catch (err) {
     errors.push(
       `Product Hunt general error: ${err instanceof Error ? err.message : 'Unknown error'}`
@@ -120,90 +109,3 @@ function formatCategory(slug: string): string {
     .join(' ')
 }
 
-/**
- * Fallback list of popular Product Hunt products for when scraping fails
- */
-function getFallbackProductHuntProducts(): DiscoveredService[] {
-  return [
-    {
-      name: 'Notion',
-      description: 'All-in-one workspace for notes, docs, and collaboration',
-      website: 'https://notion.so',
-      category: 'Productivity',
-      source: 'product_hunt',
-      source_url: 'https://www.producthunt.com/products/notion',
-    },
-    {
-      name: 'Figma',
-      description: 'Collaborative interface design tool',
-      website: 'https://figma.com',
-      category: 'Design Tools',
-      source: 'product_hunt',
-      source_url: 'https://www.producthunt.com/products/figma',
-    },
-    {
-      name: 'Linear',
-      description: 'Issue tracking and project management',
-      website: 'https://linear.app',
-      category: 'Developer Tools',
-      source: 'product_hunt',
-      source_url: 'https://www.producthunt.com/products/linear',
-    },
-    {
-      name: 'Vercel',
-      description: 'Frontend cloud platform for developers',
-      website: 'https://vercel.com',
-      category: 'Developer Tools',
-      source: 'product_hunt',
-      source_url: 'https://www.producthunt.com/products/vercel',
-    },
-    {
-      name: 'Raycast',
-      description: 'Productivity tool and launcher for Mac',
-      website: 'https://raycast.com',
-      category: 'Productivity',
-      source: 'product_hunt',
-      source_url: 'https://www.producthunt.com/products/raycast',
-    },
-    {
-      name: 'Midjourney',
-      description: 'AI image generation tool',
-      website: 'https://midjourney.com',
-      category: 'Artificial Intelligence',
-      source: 'product_hunt',
-      source_url: 'https://www.producthunt.com/products/midjourney',
-    },
-    {
-      name: 'ChatGPT',
-      description: 'AI chatbot by OpenAI',
-      website: 'https://chat.openai.com',
-      category: 'Artificial Intelligence',
-      source: 'product_hunt',
-      source_url: 'https://www.producthunt.com/products/chatgpt',
-    },
-    {
-      name: 'Claude',
-      description: 'AI assistant by Anthropic',
-      website: 'https://claude.ai',
-      category: 'Artificial Intelligence',
-      source: 'product_hunt',
-      source_url: 'https://www.producthunt.com/products/claude',
-    },
-    {
-      name: 'Cursor',
-      description: 'AI-powered code editor',
-      website: 'https://cursor.sh',
-      category: 'Developer Tools',
-      source: 'product_hunt',
-      source_url: 'https://www.producthunt.com/products/cursor',
-    },
-    {
-      name: 'Loom',
-      description: 'Video messaging for work',
-      website: 'https://loom.com',
-      category: 'Productivity',
-      source: 'product_hunt',
-      source_url: 'https://www.producthunt.com/products/loom',
-    },
-  ]
-}

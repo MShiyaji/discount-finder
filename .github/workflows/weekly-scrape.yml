@@ -33,6 +33,18 @@ jobs:
             exit 1
           fi
 
+          # Save response for artifact upload
+          mkdir -p results
+          echo "$BODY" | jq . > results/discover.json 2>/dev/null || echo "$BODY" > results/discover.json
+
+      - name: Upload discover results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: discover-results-${{ github.run_id }}
+          path: results/discover.json
+          retention-days: 90
+
   research:
     name: Research Discounts
     runs-on: ubuntu-latest
@@ -56,3 +68,15 @@ jobs:
             echo "::error::Research endpoint returned HTTP $HTTP_CODE"
             exit 1
           fi
+
+          # Save response for artifact upload
+          mkdir -p results
+          echo "$BODY" | jq . > results/research.json 2>/dev/null || echo "$BODY" > results/research.json
+
+      - name: Upload research results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-results-${{ github.run_id }}
+          path: results/research.json
+          retention-days: 90

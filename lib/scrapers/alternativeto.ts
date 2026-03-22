@@ -88,17 +88,6 @@ export async function scrapeAlternativeTo(
         )
       }
     }
-
-    // Fallback to curated list
-    if (services.length < 10) {
-      const fallbackProducts = getFallbackAlternativeToProducts()
-      for (const product of fallbackProducts) {
-        if (!services.some((s) => s.name === product.name)) {
-          services.push(product)
-        }
-        if (services.length >= limit) break
-      }
-    }
   } catch (err) {
     errors.push(
       `AlternativeTo general error: ${err instanceof Error ? err.message : 'Unknown error'}`
@@ -128,87 +117,3 @@ function getCategoryFromApp(app: string): string {
   return categoryMap[app] || 'Software'
 }
 
-function getFallbackAlternativeToProducts(): DiscoveredService[] {
-  return [
-    {
-      name: 'Spotify',
-      description: 'Music streaming service',
-      website: 'https://spotify.com',
-      category: 'Music Streaming',
-      source: 'alternativeto',
-      source_url: 'https://alternativeto.net/software/spotify/',
-    },
-    {
-      name: 'Netflix',
-      description: 'Video streaming service',
-      website: 'https://netflix.com',
-      category: 'Video Streaming',
-      source: 'alternativeto',
-      source_url: 'https://alternativeto.net/software/netflix/',
-    },
-    {
-      name: 'Adobe Creative Cloud',
-      description: 'Creative software suite',
-      website: 'https://adobe.com/creativecloud',
-      category: 'Design Software',
-      source: 'alternativeto',
-      source_url: 'https://alternativeto.net/software/adobe-creative-cloud/',
-    },
-    {
-      name: 'Microsoft 365',
-      description: 'Productivity suite',
-      website: 'https://microsoft.com/microsoft-365',
-      category: 'Office Suite',
-      source: 'alternativeto',
-      source_url: 'https://alternativeto.net/software/microsoft-office/',
-    },
-    {
-      name: 'GitHub',
-      description: 'Code hosting and collaboration',
-      website: 'https://github.com',
-      category: 'Developer Tools',
-      source: 'alternativeto',
-      source_url: 'https://alternativeto.net/software/github/',
-    },
-    {
-      name: 'Discord',
-      description: 'Voice, video, and text communication',
-      website: 'https://discord.com',
-      category: 'Communication',
-      source: 'alternativeto',
-      source_url: 'https://alternativeto.net/software/discord/',
-    },
-    {
-      name: 'Bitwarden',
-      description: 'Open source password manager',
-      website: 'https://bitwarden.com',
-      category: 'Password Manager',
-      source: 'alternativeto',
-      source_url: 'https://alternativeto.net/software/bitwarden/',
-    },
-    {
-      name: 'YouTube Premium',
-      description: 'Ad-free YouTube with music',
-      website: 'https://youtube.com/premium',
-      category: 'Video Streaming',
-      source: 'alternativeto',
-      source_url: 'https://alternativeto.net/software/youtube/',
-    },
-    {
-      name: 'Obsidian',
-      description: 'Knowledge base and note-taking',
-      website: 'https://obsidian.md',
-      category: 'Note Taking',
-      source: 'alternativeto',
-      source_url: 'https://alternativeto.net/software/obsidian/',
-    },
-    {
-      name: 'VS Code',
-      description: 'Source code editor',
-      website: 'https://code.visualstudio.com',
-      category: 'Developer Tools',
-      source: 'alternativeto',
-      source_url: 'https://alternativeto.net/software/visual-studio-code/',
-    },
-  ]
-}
