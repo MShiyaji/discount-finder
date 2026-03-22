@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { discoverServices, saveDiscoveredServices } from '@/lib/scrapers'
+import { createClient } from '@/lib/supabase/server'
 
 export const maxDuration = 60
 
@@ -11,11 +12,13 @@ export async function POST() {
   const startTime = Date.now()
 
   try {
+    const supabase = await createClient()
+
     // Run service discovery
     const { services, errors, stats } = await discoverServices(30)
 
     // Save discovered services to database
-    const saveResult = await saveDiscoveredServices(services)
+    const saveResult = await saveDiscoveredServices(supabase, services)
 
     const duration = Date.now() - startTime
 

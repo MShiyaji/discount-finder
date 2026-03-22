@@ -16,10 +16,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
     const { serviceId, limit = 5 } = body
+    const supabase = await createClient()
 
     // If specific service ID provided, research just that one
     if (serviceId) {
-      const supabase = await createClient()
       const { data: service, error } = await supabase
         .from('services')
         .select('id, name, website')
@@ -34,6 +34,7 @@ export async function POST(request: Request) {
       }
 
       const result = await researchAndSaveDiscounts(
+        supabase,
         service.id,
         service.name,
         service.website
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
     }
 
     // Otherwise, research batch of services
-    const services = await getServicesNeedingResearch(Math.min(limit, 10))
+    const services = await getServicesNeedingResearch(supabase, Math.min(limit, 10))
 
     if (services.length === 0) {
       return NextResponse.json({
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
       })
     }
 
-    const result = await batchResearchServices(services)
+    const result = await batchResearchServices(supabase, services)
 
     return NextResponse.json({
       success: true,

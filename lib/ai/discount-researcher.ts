@@ -1,6 +1,5 @@
-import { generateText, tool, Output } from 'ai'
-import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
+import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { DiscountInfo, DiscountType } from '@/lib/scrapers/types'
 
 const DISCOUNT_TYPES: DiscountType[] = [
@@ -18,82 +17,89 @@ const DISCOUNT_TYPES: DiscountType[] = [
   'free_tier',
 ]
 
-const DiscountSchema = z.object({
-  discounts: z.array(
-    z.object({
-      type: z.enum([
-        'student',
-        'seasonal',
-        'bundle',
-        'military',
-        'senior',
-        'nonprofit',
-        'referral',
-        'loyalty',
-        'regional',
-        'employer',
-        'credit_card',
-        'free_tier',
-      ]),
-      description: z.string().describe('Brief description of the discount'),
-      discount_amount: z
-        .string()
-        .nullable()
-        .describe('Fixed discount amount if applicable, e.g., "$5 off"'),
-      discount_percentage: z
-        .number()
-        .nullable()
-        .describe('Percentage discount if applicable, e.g., 50 for 50% off'),
-      eligibility_requirements: z
-        .string()
-        .nullable()
-        .describe('Who qualifies for this discount'),
-      how_to_claim: z
-        .string()
-        .nullable()
-        .describe('Steps to claim the discount'),
-      valid_from: z
-        .string()
-        .nullable()
-        .describe('Start date if seasonal (ISO format)'),
-      valid_until: z
-        .string()
-        .nullable()
-        .describe('End date if seasonal (ISO format)'),
-      source_url: z
-        .string()
-        .nullable()
-        .describe('URL where this discount was found'),
-      confidence_score: z
-        .number()
-        .min(0)
-        .max(100)
-        .describe('How confident you are this information is accurate (0-100)'),
-    })
-  ),
-})
+// Gemini structured output schema (JSON Schema format)
+const discountResponseSchema: Schema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    discounts: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          type: {
+            type: SchemaType.STRING,
+            format: 'enum',
+            enum: [
+              'student',
+              'seasonal',
+              'bundle',
+              'military',
+              'senior',
+              'nonprofit',
+              'referral',
+              'loyalty',
+              'regional',
+              'employer',
+              'credit_card',
+              'free_tier',
+            ],
+            description: 'The type of discount',
+          },
+          description: {
+            type: SchemaType.STRING,
+            description: 'Brief description of the discount',
+          },
+          discount_amount: {
+            type: SchemaType.STRING,
+            nullable: true,
+            description:
+              'Fixed discount amount if applicable, e.g., "$5 off"',
+          },
+          discount_percentage: {
+            type: SchemaType.NUMBER,
+            nullable: true,
+            description:
+              'Percentage discount if applicable, e.g., 50 for 50% off',
+          },
+          eligibility_requirements: {
+            type: SchemaType.STRING,
+            nullable: true,
+            description: 'Who qualifies for this discount',
+          },
+          how_to_claim: {
+            type: SchemaType.STRING,
+            nullable: true,
+            description: 'Steps to claim the discount',
+          },
+          valid_from: {
+            type: SchemaType.STRING,
+            nullable: true,
+            description: 'Start date if seasonal (ISO format)',
+          },
+          valid_until: {
+            type: SchemaType.STRING,
+            nullable: true,
+            description: 'End date if seasonal (ISO format)',
+          },
+          source_url: {
+            type: SchemaType.STRING,
+            nullable: true,
+            description: 'URL where this discount was found',
+          },
+          confidence_score: {
+            type: SchemaType.NUMBER,
+            description:
+              'How confident you are this information is accurate (0-100)',
+          },
+        },
+        required: ['type', 'description', 'confidence_score'],
+      },
+    },
+  },
+  required: ['discounts'],
+}
 
-/**
- * Researches discounts for a given service using AI with web search
- */
-export async function researchServiceDiscounts(
-  serviceName: string,
-  serviceWebsite: string | null
-): Promise<DiscountInfo[]> {
-  const websiteInfo = serviceWebsite ? ` (${serviceWebsite})` : ''
-
-  const searchQueries = [
-    `${serviceName} student discount education pricing`,
-    `${serviceName} black friday cyber monday deals history`,
-    `${serviceName} bundle deal included free with`,
-    `${serviceName} military veteran discount`,
-    `${serviceName} nonprofit charity discount`,
-    `${serviceName} referral program credits`,
-    `${serviceName} free tier free plan pricing`,
-    `${serviceName} corporate enterprise discount employer perk`,
-  ]
-
-  const systemPrompt = `You are a discount research assistant. Your job is to find all available discounts and savings opportunities for software and services.
+const SYSTEM_PROMPT = `You are a discount research assistant. Your job is to find all available discounts and savings opportunities for software and services.
 
 For each service, research and report on these discount types:
 - student: Educational discounts for students with .edu emails or student ID
@@ -113,11 +119,43 @@ Be thorough but only report discounts you have high confidence actually exist.
 Include source URLs when possible.
 For seasonal discounts, note historical patterns (e.g., "Usually 40% off during Black Friday").`
 
-  try {
-    const result = await generateText({
-      model: 'openai/gpt-4o-mini',
-      system: systemPrompt,
-      prompt: `Research all available discounts and savings opportunities for: ${serviceName}${websiteInfo}
+/**
+ * Researches discounts for a given service using Gemini AI
+ */
+export async function researchServiceDiscounts(
+  serviceName: string,
+  serviceWebsite: string | null
+): Promise<DiscountInfo[]> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set')
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey)
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    systemInstruction: SYSTEM_PROMPT,
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: discountResponseSchema,
+      maxOutputTokens: 4000,
+    },
+  })
+
+  const websiteInfo = serviceWebsite ? ` (${serviceWebsite})` : ''
+
+  const searchQueries = [
+    `${serviceName} student discount education pricing`,
+    `${serviceName} black friday cyber monday deals history`,
+    `${serviceName} bundle deal included free with`,
+    `${serviceName} military veteran discount`,
+    `${serviceName} nonprofit charity discount`,
+    `${serviceName} referral program credits`,
+    `${serviceName} free tier free plan pricing`,
+    `${serviceName} corporate enterprise discount employer perk`,
+  ]
+
+  const prompt = `Research all available discounts and savings opportunities for: ${serviceName}${websiteInfo}
 
 Search for information about:
 ${searchQueries.map((q, i) => `${i + 1}. ${q}`).join('\n')}
@@ -132,12 +170,15 @@ Return a comprehensive list of all discounts found. For each discount, include:
 - Source URL if available
 - Your confidence score (0-100)
 
-Only include discounts you're confident actually exist. If you're unsure about a discount, either omit it or give it a low confidence score.`,
-      output: Output.object({ schema: DiscountSchema }),
-      maxOutputTokens: 4000,
-    })
+Only include discounts you're confident actually exist. If you're unsure about a discount, either omit it or give it a low confidence score.`
 
-    return result.output?.discounts || []
+  try {
+    const result = await model.generateContent(prompt)
+    const response = result.response
+    const text = response.text()
+    const parsed = JSON.parse(text)
+
+    return parsed.discounts || []
   } catch (error) {
     console.error(`Error researching ${serviceName}:`, error)
     return []
@@ -148,10 +189,10 @@ Only include discounts you're confident actually exist. If you're unsure about a
  * Saves researched discounts to the database
  */
 export async function saveDiscounts(
+  supabase: SupabaseClient,
   serviceId: string,
   discounts: DiscountInfo[]
 ): Promise<{ saved: number; errors: string[] }> {
-  const supabase = await createClient()
   let saved = 0
   const errors: string[] = []
 
@@ -197,6 +238,7 @@ export async function saveDiscounts(
  * Full research pipeline for a service
  */
 export async function researchAndSaveDiscounts(
+  supabase: SupabaseClient,
   serviceId: string,
   serviceName: string,
   serviceWebsite: string | null
@@ -205,7 +247,7 @@ export async function researchAndSaveDiscounts(
   saved: number
   errors: string[]
 }> {
-  // Research discounts using AI
+  // Research discounts using Gemini AI
   const discounts = await researchServiceDiscounts(serviceName, serviceWebsite)
 
   if (discounts.length === 0) {
@@ -213,10 +255,9 @@ export async function researchAndSaveDiscounts(
   }
 
   // Save to database
-  const { saved, errors } = await saveDiscounts(serviceId, discounts)
+  const { saved, errors } = await saveDiscounts(supabase, serviceId, discounts)
 
   // Update last_researched_at on the service
-  const supabase = await createClient()
   await supabase
     .from('services')
     .update({ last_researched_at: new Date().toISOString() })
@@ -233,6 +274,7 @@ export async function researchAndSaveDiscounts(
  * Batch research multiple services
  */
 export async function batchResearchServices(
+  supabase: SupabaseClient,
   services: { id: string; name: string; website: string | null }[],
   onProgress?: (current: number, total: number, serviceName: string) => void
 ): Promise<{
@@ -249,6 +291,7 @@ export async function batchResearchServices(
 
     try {
       const result = await researchAndSaveDiscounts(
+        supabase,
         service.id,
         service.name,
         service.website

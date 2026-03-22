@@ -11,9 +11,11 @@ export const maxDuration = 300 // 5 minutes for AI research
  * Processes 10 services per run to stay within limits
  */
 export async function GET(request: Request) {
-  // Verify cron secret
+  // Verify cron secret (skipped in local development)
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const isDev = process.env.NODE_ENV === 'development'
+
+  if (!isDev && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -38,7 +40,7 @@ export async function GET(request: Request) {
     }
 
     // Get services that need research
-    const services = await getServicesNeedingResearch(10)
+    const services = await getServicesNeedingResearch(supabase, 10)
 
     if (services.length === 0) {
       // Update job as completed with no work
@@ -63,7 +65,7 @@ export async function GET(request: Request) {
     }
 
     // Research discounts for each service
-    const result = await batchResearchServices(services)
+    const result = await batchResearchServices(supabase, services)
 
     const duration = Date.now() - startTime
 

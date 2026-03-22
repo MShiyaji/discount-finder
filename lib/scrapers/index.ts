@@ -1,8 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
 import { scrapeProductHunt } from './product-hunt'
 import { scrapeG2 } from './g2'
 import { scrapeAlternativeTo } from './alternativeto'
 import type { DiscoveredService, ScraperResult } from './types'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export * from './types'
 
@@ -90,13 +90,13 @@ function normalizeServiceName(name: string): string {
  * Saves discovered services to the database
  */
 export async function saveDiscoveredServices(
+  supabase: SupabaseClient,
   services: DiscoveredService[]
 ): Promise<{
   inserted: number
   updated: number
   errors: string[]
 }> {
-  const supabase = await createClient()
   let inserted = 0
   let updated = 0
   const errors: string[] = []
@@ -163,10 +163,9 @@ export async function saveDiscoveredServices(
  * Gets services that need discount research
  */
 export async function getServicesNeedingResearch(
+  supabase: SupabaseClient,
   limit: number = 10
 ): Promise<{ id: string; name: string; website: string | null }[]> {
-  const supabase = await createClient()
-
   // Get services that haven't been researched in the last 7 days
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
@@ -189,8 +188,10 @@ export async function getServicesNeedingResearch(
 /**
  * Marks a service as researched
  */
-export async function markServiceResearched(serviceId: string): Promise<void> {
-  const supabase = await createClient()
+export async function markServiceResearched(
+  supabase: SupabaseClient,
+  serviceId: string
+): Promise<void> {
   await supabase
     .from('services')
     .update({ last_researched_at: new Date().toISOString() })

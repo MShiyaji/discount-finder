@@ -9,9 +9,11 @@ export const maxDuration = 60
  * Runs weekly to find new services to research
  */
 export async function GET(request: Request) {
-  // Verify cron secret
+  // Verify cron secret (skipped in local development)
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const isDev = process.env.NODE_ENV === 'development'
+  
+  if (!isDev && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -39,7 +41,7 @@ export async function GET(request: Request) {
     const { services, errors, stats } = await discoverServices(30)
 
     // Save discovered services to database
-    const saveResult = await saveDiscoveredServices(services)
+    const saveResult = await saveDiscoveredServices(supabase, services)
 
     const duration = Date.now() - startTime
 
